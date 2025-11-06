@@ -10,7 +10,6 @@ def community_detection():
     results = [] 
     G = graph_creation.graph_creation()
 
-    print(nx.info(G))
 
     # Louvain community detection
     communities = louvain_communities(G, seed=42)
