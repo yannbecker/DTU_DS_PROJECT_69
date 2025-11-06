@@ -2,7 +2,7 @@
 
 `data/processed/articles.json`
 - 
-```json
+```
 articles : list[{
     id : [id_article],
     title : [title_article],
