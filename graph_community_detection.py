@@ -20,7 +20,7 @@ def community_detection():
 
     for comm in communities:
         # Identify the node with the highest degree as the representative
-        representative_article = sorted(comm, key=lambda x: G.degree(x), reverse=True)[0]
+        representative_article = sorted(comm, key=lambda x: G.in_degree(x), reverse=True)[0]
         results.append({
             'representative_node' : representative_article,
             # Convert set to list for JSON serialization

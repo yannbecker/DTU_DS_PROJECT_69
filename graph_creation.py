@@ -2,7 +2,7 @@ import networkx as nx
 import json
 
 def graph_creation(json_path='data/processed/articles.json'):
-    G = nx.Graph()
+    G = nx.DiGraph()
     with open(json_path) as json_file:
         data = json.load(json_file)
     for article in data.get('articles'):
