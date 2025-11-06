@@ -1,5 +1,6 @@
 # Data directory
 data/
+dataset/
 
 # Python virtual environment
 .venv
@@ -17,3 +18,7 @@ __pycache__/
 .DS_Store
 .DS_Store?
 ._*
+.json
+.csv
+.npy
+.index
