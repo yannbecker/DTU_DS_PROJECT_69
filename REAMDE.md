@@ -1,6 +1,6 @@
 ## Desired data format after preprocessing.
 
-`articles.json`
+`data/processed/articles.json`
 - 
 ```json
 articles : list[{
