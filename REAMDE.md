@@ -1,3 +1,11 @@
+## File description
+- `build_processed_dataset.py` : with the two datasets, creates the processed one (`articles.json`)
+- `graph_creation.py` : create a networkx graph from the processed json (`articles.json`)
+- `graph_community_detection.py` : uses `graph_creation.py` to create a graph and uses the louvain algorithm to identify communities.
+
+---
+- `test.py` : verify if all the article ids from the reference dataseta are in the orignal dataset arxiv.
+
 ## Desired data format after preprocessing.
 
 `data/processed/articles.json`

@@ -1,9 +1,8 @@
 import json
 import gzip
 import sys
-import os # Ajouté pour créer le dossier de sortie
+import os 
 
-# --- À CONFIGURER ---
 
 # Fichiers d'entrée (basés sur votre script)
 METADATA_FILE = "data/arxiv-metadata-oai-snapshot.json" 
@@ -16,8 +15,8 @@ OUTPUT_FILE = "data/processed/articles.json"
 
 # Clés pour le fichier de métadonnées
 METADATA_ID_KEY = "id"
-METADATA_TITLE_KEY = "title"       # À VÉRIFIER DANS VOTRE JSON
-METADATA_ABSTRACT_KEY = "abstract" # À VÉRIFIER DANS VOTRE JSON
+METADATA_TITLE_KEY = "title"      
+METADATA_ABSTRACT_KEY = "abstract" 
 
 # Clés pour le fichier graphe
 GRAPH_SOURCE_ID_KEY = "id"
@@ -34,15 +33,12 @@ def build_processed_json(metadata_path, graph_path, output_path,
     et du graphe de citations.
     """
     
-    # Étape 1: Charger toutes les métadonnées en mémoire
-    # Nous utilisons un dictionnaire pour un accès rapide par ID.
     print(f"[Étape 1] Chargement des métadonnées depuis {metadata_path}...")
     print("ATTENTION : Cette étape peut nécessiter beaucoup de RAM.")
     
     all_articles = {} # Dictionnaire {id_article: {article_data}}
     
     try:
-        # Gère les fichiers .gz ou non-gz
         f_open_meta = gzip.open if metadata_path.endswith('.gz') else open
         
         with f_open_meta(metadata_path, 'rt', encoding='utf-8') as f:
@@ -51,7 +47,6 @@ def build_processed_json(metadata_path, graph_path, output_path,
                     article = json.loads(line)
                     
                     article_id = article.get(meta_id_key)
-                    # Utilise .get() avec une valeur par défaut au cas où
                     title = article.get(meta_title_key, "Titre non trouvé")
                     abstract = article.get(meta_abstract_key, "Résumé non trouvé")
                     
@@ -59,12 +54,11 @@ def build_processed_json(metadata_path, graph_path, output_path,
                         print(f"  Ligne {i+1} (metadata) sans ID, passée.")
                         continue
                         
-                    # Stocker l'article avec une liste de refs vide
                     all_articles[article_id] = {
                         "id": article_id,
                         "title": title,
                         "abstract": abstract,
-                        "refs": []  # Sera rempli à l'étape 2
+                        "refs": [] 
                     }
                     
                     if (i+1) % 500000 == 0:
@@ -88,7 +82,6 @@ def build_processed_json(metadata_path, graph_path, output_path,
 
     # ---
     
-    # Étape 2: Parcourir le graphe pour "remplir" les listes de références
     print(f"\n[Étape 2] Mise à jour des références depuis {graph_path}...")
     
     try:
@@ -109,13 +102,10 @@ def build_processed_json(metadata_path, graph_path, output_path,
                     
                     lines_processed += 1
                     
-                    # Mettre à jour l'entrée existante (chargée à l'étape 1)
                     if source_id in all_articles:
                         all_articles[source_id]["refs"] = references
                         refs_updated += 1
                     else:
-                        # Cas où un ID du graphe n'est pas dans les métadonnées
-                        # (votre script de vérification est censé attraper ça)
                         if (lines_processed % 10000 == 0): # Évite de spammer
                             print(f"  ... (Avertissement) ID {source_id} du graphe non trouvé dans les métadonnées.")
                             
@@ -134,9 +124,8 @@ def build_processed_json(metadata_path, graph_path, output_path,
         print(f"Une erreur est survenue (graphe): {e}")
         sys.exit(1)
 
-    # ---
+
     
-    # Étape 3: Formater et sauvegarder le fichier final
     print(f"\n[Étape 3] Formatage et sauvegarde vers {output_path}...")
     
     try:
@@ -153,8 +142,6 @@ def build_processed_json(metadata_path, graph_path, output_path,
         final_data = {"articles": final_article_list}
         
         # Écrire le fichier JSON
-        # Note : json.dump est lent pour de très gros fichiers.
-        # Pour une version plus rapide (mais moins lisible), retirez 'indent=2'
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(final_data, f, indent=2) 
             
@@ -166,7 +153,6 @@ def build_processed_json(metadata_path, graph_path, output_path,
         sys.exit(1)
 
 
-# --- Point d'entrée du script ---
 if __name__ == "__main__":
     build_processed_json(
         METADATA_FILE,
