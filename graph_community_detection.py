@@ -6,7 +6,6 @@ import json
 import graph_creation
 
 def community_detection():
-    # Corrected typo: 'commutinity' -> 'community'
     results = [] 
     G = graph_creation.graph_creation()
 

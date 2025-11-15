@@ -4,30 +4,27 @@ import sys
 import os 
 
 
-# Fichiers d'entrée (basés sur votre script)
+# Fichiers d'entrée
 METADATA_FILE = "data/arxiv-metadata-oai-snapshot.json" 
-GRAPH_FILE = "data/internal-references-pdftotext.json"
+GRAPH_FILE = "data/internal-references-processed.json.gz"
 
-# Fichier de sortie (selon votre demande)
+# Fichier de sortie
 OUTPUT_FILE = "data/processed/articles.json"
 
 # --- Clés des fichiers (ajustez si nécessaire) ---
-
-# Clés pour le fichier de métadonnées
 METADATA_ID_KEY = "id"
-METADATA_TITLE_KEY = "title"      
+METADATA_TITLE_KEY = "title" 
 METADATA_ABSTRACT_KEY = "abstract" 
 
-# Clés pour le fichier graphe
-GRAPH_SOURCE_ID_KEY = "id"
-GRAPH_REFERENCES_KEY = "references"
+# --- Clés du graphe (non utilisées car le format est {id: [refs]}) ---
+# GRAPH_SOURCE_ID_KEY = "id"
+# GRAPH_REFERENCES_KEY = "references"
 
 # --- FIN DE LA CONFIGURATION ---
 
 
 def build_processed_json(metadata_path, graph_path, output_path,
-                         meta_id_key, meta_title_key, meta_abstract_key,
-                         graph_id_key, graph_refs_key):
+                         meta_id_key, meta_title_key, meta_abstract_key):
     """
     Construit le fichier JSON combiné 'articles.json' à partir des métadonnées
     et du graphe de citations.
@@ -51,22 +48,22 @@ def build_processed_json(metadata_path, graph_path, output_path,
                     abstract = article.get(meta_abstract_key, "Résumé non trouvé")
                     
                     if not article_id:
-                        print(f"  Ligne {i+1} (metadata) sans ID, passée.")
+                        print(f"   Ligne {i+1} (metadata) sans ID, passée.")
                         continue
                         
                     all_articles[article_id] = {
                         "id": article_id,
                         "title": title,
                         "abstract": abstract,
-                        "refs": [] 
+                        "refs": [] # Sera rempli à l'étape 2
                     }
                     
                     if (i+1) % 500000 == 0:
-                        print(f"  ... {i+1:,} articles chargés en mémoire")
+                        print(f"   ... {i+1:,} articles chargés en mémoire")
 
                 except json.JSONDecodeError:
                     print(f"Erreur de décodage JSON sur la ligne {i+1} (metadata), passage.")
-                    
+            
         print(f"[Étape 1] Terminé. {len(all_articles):,} articles uniques chargés.")
 
     except FileNotFoundError:
@@ -84,38 +81,45 @@ def build_processed_json(metadata_path, graph_path, output_path,
     
     print(f"\n[Étape 2] Mise à jour des références depuis {graph_path}...")
     
+    # *** DÉBUT DE LA MODIFICATION ***
+    # Ce fichier est un objet JSON unique, pas un JSON Lines.
+    
+    graph_data = {} # Pour stocker le graphe chargé
     try:
         f_open_graph = gzip.open if graph_path.endswith('.gz') else open
         
         with f_open_graph(graph_path, 'rt', encoding='utf-8') as f:
-            lines_processed = 0
+            print("   ... Chargement de l'objet JSON du graphe en mémoire...")
+            
+            # Charger le fichier JSON en entier
+            graph_data = json.load(f)
+            
+            print(f"   ... Graphe chargé. {len(graph_data):,} articles sources trouvés.")
+            
             refs_updated = 0
-            for i, line in enumerate(f):
-                try:
-                    entry = json.loads(line)
-                    
-                    source_id = entry.get(graph_id_key)
-                    references = entry.get(graph_refs_key, [])
-                    
-                    if not source_id:
-                        continue
-                    
-                    lines_processed += 1
-                    
-                    if source_id in all_articles:
-                        all_articles[source_id]["refs"] = references
-                        refs_updated += 1
-                    else:
-                        if (lines_processed % 10000 == 0): # Évite de spammer
-                            print(f"  ... (Avertissement) ID {source_id} du graphe non trouvé dans les métadonnées.")
-                            
-                    if (i+1) % 500000 == 0:
-                        print(f"  ... {i+1:,} lignes du graphe traitées")
+            articles_processed = 0
+
+            # Itérer sur les paires clé/valeur (ex: "id_source": [refs_list])
+            for source_id, references in graph_data.items():
+                
+                articles_processed += 1
+                
+                if source_id in all_articles:
+                    # Ajouter la liste de références à l'article existant
+                    all_articles[source_id]["refs"] = references
+                    refs_updated += 1
+                else:
+                    # Ceci ne devrait pas arriver si le graphe a été
+                    # correctement "processed" (nettoyé) à l'étape précédente.
+                    if (articles_processed % 10000 == 0): # Évite de spammer
+                        print(f"   ... (Avertissement) ID {source_id} du graphe 'processed' non trouvé dans les métadonnées.")
                         
-                except json.JSONDecodeError:
-                    print(f"Erreur de décodage JSON sur la ligne {i+1} (graphe), passage.")
+                if (articles_processed % 500000 == 0):
+                    print(f"   ... {articles_processed:,} articles du graphe traités")
 
         print(f"[Étape 2] Terminé. {refs_updated:,} listes de références mises à jour.")
+    
+    # *** FIN DE LA MODIFICATION ***
 
     except FileNotFoundError:
         print(f"ERREUR: Le fichier graphe '{graph_path}' n'a pas été trouvé.")
@@ -133,20 +137,30 @@ def build_processed_json(metadata_path, graph_path, output_path,
         output_dir = os.path.dirname(output_path)
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
-            print(f"  Dossier '{output_dir}' créé.")
+            print(f"   Dossier '{output_dir}' créé.")
             
-        # Convertir le dictionnaire de {id: article} en une liste [article1, article2, ...]
-        final_article_list = list(all_articles.values())
+        # *** AMÉLIORATION ***
+        # Ne garder que les articles qui étaient dans le graphe "processed"
+        print(f"   ... Filtrage des {len(all_articles):,} articles pour ne garder que les {len(graph_data):,} du graphe.")
+        
+        graph_source_ids = set(graph_data.keys())
+        final_article_list = []
+        
+        for article_id, article_data in all_articles.items():
+            if article_id in graph_source_ids:
+                final_article_list.append(article_data)
         
         # Créer la structure de données finale
         final_data = {"articles": final_article_list}
         
         # Écrire le fichier JSON
         with open(output_path, 'w', encoding='utf-8') as f:
+            # Utiliser indent=2 pour un fichier lisible (plus gros)
+            # ou None pour un fichier compact (plus petit)
             json.dump(final_data, f, indent=2) 
             
         print(f"\n✅ SUCCÈS ! Fichier sauvegardé.")
-        print(f"  Total d'articles dans le fichier : {len(final_article_list):,}")
+        print(f"   Total d'articles dans le fichier : {len(final_article_list):,}")
 
     except Exception as e:
         print(f"ERREUR fatale lors de la sauvegarde du JSON: {e}")
@@ -160,7 +174,6 @@ if __name__ == "__main__":
         OUTPUT_FILE,
         METADATA_ID_KEY,
         METADATA_TITLE_KEY,
-        METADATA_ABSTRACT_KEY,
-        GRAPH_SOURCE_ID_KEY,
-        GRAPH_REFERENCES_KEY
+        METADATA_ABSTRACT_KEY
+        # Les clés du graphe ne sont plus nécessaires en argument
     )

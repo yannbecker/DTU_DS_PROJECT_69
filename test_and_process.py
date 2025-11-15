@@ -3,13 +3,19 @@ import gzip
 import sys
 
 
-# Mettez ici le chemin vers votre fichier de métadonnées (le gros fichier JSON)
+# --- CONFIGURATION ---
+
+# Fichier des métadonnées (JSON Lines)
 METADATA_FILE = "data/arxiv-metadata-oai-snapshot.json" 
 
-# Mettez ici le chemin vers votre fichier de graphe
-GRAPH_FILE = "data/internal-references-processed.json.gz"
+# Fichier du graphe original (JSON unique)
+GRAPH_FILE = "data/internal-references-pdftotext.json"
 
-# Ajustez ces clés si elles sont différentes dans vos fichiers
+# Fichier de sortie pour le graphe nettoyé
+# (Utiliser .json.gz est recommandé pour économiser de l'espace)
+PROCESSED_GRAPH_FILE = "data/internal-references-processed.json.gz"
+
+# Clés
 METADATA_ID_KEY = "id"
 GRAPH_SOURCE_ID_KEY = "id" 
 GRAPH_REFERENCES_KEY = "references"
@@ -19,7 +25,7 @@ GRAPH_REFERENCES_KEY = "references"
 
 def load_metadata_ids(metadata_file, id_key):
     """
-    Charge tous les ID du fichier de métadonnées dans un set.
+    [ÉTAPE 1] Charge tous les ID du fichier de métadonnées dans un set.
     """
     print(f"[Étape 1] Chargement des ID depuis {metadata_file}...")
     metadata_ids = set()
@@ -42,64 +48,89 @@ def load_metadata_ids(metadata_file, id_key):
         sys.exit(1)
     except Exception as e:
         print(f"Une erreur est survenue lors de la lecture du fichier de métadonnées: {e}")
-        print("S'il ne s'agit pas d'un fichier JSON Lines, le script doit être adapté.")
         sys.exit(1)
         
     print(f"[Étape 1] Terminé. {len(metadata_ids)} ID uniques chargés.")
     return metadata_ids
 
-def check_graph_nodes(graph_file, metadata_ids, source_key, refs_key):
+def check_and_filter_graph(graph_file, metadata_ids, processed_graph_file):
     """
-    Vérifie chaque noeud (source et cible) du fichier graphe contre le set d'ID.
-    Renvoie les ID manquants ET tous les ID uniques trouvés dans le graphe.
+    [ÉTAPE 2 & 3] Vérifie le graphe, crée une version filtrée et l'enregistre.
     """
-    print(f"\n[Étape 2] Vérification des nœuds du graphe depuis {graph_file}...")
+    print(f"\n[Étape 2] Vérification et filtrage des nœuds depuis {graph_file}...")
     print("   (Mode de lecture: Objet JSON unique)")
     
     try:
         f_open = gzip.open if graph_file.endswith('.gz') else open
         
+        graph_data = None
         with f_open(graph_file, 'rt', encoding='utf-8') as f:
-            
-            missing_ids = set()
-            all_graph_ids = set() # *** NOUVEAU: Pour compter tous les ID uniques ***
-            nodes_checked = 0
-            
             try:
                 print("   ... Chargement de l'objet JSON du graphe en mémoire...")
                 graph_data = json.load(f) 
             except json.JSONDecodeError as e:
                 print(f"ERREUR: Le fichier graphe n'est pas un JSON valide. Erreur: {e}")
                 sys.exit(1)
+        
+        print(f"   ... {len(graph_data):,} articles sources chargés. Vérification et filtrage...")
+        
+        # --- NOUVEAU : Initialisation des sets de stats et du graphe filtré ---
+        missing_ids = set()
+        all_graph_ids = set()
+        processed_graph = {} # Le nouveau graphe filtré
+        
+        nodes_checked = 0
+        
+        # Itération sur le graphe original chargé en mémoire
+        for source_id, references in graph_data.items():
             
-            print(f"   ... {len(graph_data):,} articles sources chargés. Vérification des nœuds...")
-
-            for source_id, references in graph_data.items():
-                
-                # Ajouter la source au set total
-                all_graph_ids.add(source_id)
-                
-                # 1. Vérifier le nœud source
-                nodes_checked += 1
-                if source_id not in metadata_ids:
-                    missing_ids.add(source_id)
+            # --- 1. Vérification de la source (pour les stats) ---
+            all_graph_ids.add(source_id)
+            nodes_checked += 1
+            source_is_valid = (source_id in metadata_ids)
+            
+            if not source_is_valid:
+                missing_ids.add(source_id)
+            
+            # --- 2. Vérification des références (pour les stats) et préparation de la liste filtrée ---
+            processed_references_list = []
+            if references:
+                for ref_id in references:
+                    all_graph_ids.add(ref_id)
+                    nodes_checked += 1
+                    ref_is_valid = (ref_id in metadata_ids)
                     
-                # 2. Vérifier tous les nœuds cibles
-                if references:
-                    for ref_id in references:
-                        # Ajouter la référence au set total
-                        all_graph_ids.add(ref_id)
-                        
-                        nodes_checked += 1
-                        if ref_id not in metadata_ids:
-                            missing_ids.add(ref_id)
-                            
-                if nodes_checked % 1000000 == 0 and nodes_checked > 0:
-                    print(f"   ... {nodes_checked:,} nœuds (vérifications) effectués")
+                    if not ref_is_valid:
+                        missing_ids.add(ref_id)
+                    
+                    # On ajoute la réf à la liste SI ET SEULEMENT SI
+                    # la source ET la référence sont valides.
+                    if source_is_valid and ref_is_valid:
+                        processed_references_list.append(ref_id)
             
-            
+            # --- 3. Construction du graphe filtré ---
+            # On ajoute la source au nouveau graphe SEULEMENT si elle est valide.
+            if source_is_valid:
+                processed_graph[source_id] = processed_references_list
+                
+            if nodes_checked % 1000000 == 0 and nodes_checked > 0:
+                print(f"   ... {nodes_checked:,} nœuds (vérifications) effectués")
+
         print(f"[Étape 2] Terminé. {nodes_checked:,} vérifications de nœuds effectuées.")
-        # *** MODIFIÉ: Renvoie les deux sets ***
+        
+        # --- NOUVEAU : ÉTAPE 3 - ENREGISTREMENT ---
+        print(f"\n[Étape 3] Enregistrement du graphe filtré dans {processed_graph_file}...")
+        try:
+            # Détermine s'il faut utiliser gzip.open ou open standard
+            f_save_open = gzip.open if processed_graph_file.endswith('.gz') else open
+            
+            with f_save_open(processed_graph_file, 'wt', encoding='utf-8') as f_out:
+                json.dump(processed_graph, f_out)
+                
+            print(f"[Étape 3] Terminé. {len(processed_graph)} articles sources valides enregistrés.")
+        except Exception as e:
+            print(f"ERREUR lors de l'enregistrement du graphe filtré: {e}")
+            
         return missing_ids, all_graph_ids
 
     except FileNotFoundError:
@@ -118,31 +149,28 @@ def main():
         print("Aucun ID n'a été chargé depuis les métadonnées. Arrêt du script.")
         return
 
-    # Étape 2
-    # *** MODIFIÉ: Récupère les deux sets ***
-    missing_ids, all_graph_ids = check_graph_nodes(
+    # Étape 2 (Vérification) et 3 (Enregistrement)
+    missing_ids, all_graph_ids = check_and_filter_graph(
         GRAPH_FILE, 
         metadata_ids, 
-        GRAPH_SOURCE_ID_KEY, 
-        GRAPH_REFERENCES_KEY
+        PROCESSED_GRAPH_FILE # Nouvel argument
     )
 
-    # Étape 3: Rapport final
-    # *** MODIFIÉ: Ajout des calculs et du pourcentage ***
-    print("\n--- RAPPORT FINAL ---")
+    # Étape 4: Rapport final
+    print("\n--- RAPPORT FINAL (Étape 4) ---")
     
     total_unique_graph_ids = len(all_graph_ids)
     total_missing_ids = len(missing_ids)
-    total_found_ids = total_unique_graph_ids - total_missing_ids
     
     if total_unique_graph_ids == 0:
         print("Aucun ID unique n'a été trouvé dans le fichier graphe.")
+        total_found_ids = 0
         percentage_found = 0.0
     else:
-        # Calcul du pourcentage
+        total_found_ids = total_unique_graph_ids - total_missing_ids
         percentage_found = (total_found_ids / total_unique_graph_ids) * 100
 
-    print(f"Total des ID uniques dans le graphe : {total_unique_graph_ids:,}")
+    print(f"Total des ID uniques dans le graphe *original* : {total_unique_graph_ids:,}")
     print(f"Total des ID trouvés (dans metadata) : {total_found_ids:,}")
     print(f"Total des ID manquants (non trouvés) : {total_missing_ids:,}")
     print(f"")
