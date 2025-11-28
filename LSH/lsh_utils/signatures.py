@@ -1,5 +1,5 @@
-from minhash import minhash
-from shingle import shingle
+from lsh_utils.minhash import minhash
+from lsh_utils.shingle import shingle
 
 def signatures(doc_list, shingle_size, signature_size):
     "returns the dictionary of the signatures of each document. Key = doc id, Value = signature"
