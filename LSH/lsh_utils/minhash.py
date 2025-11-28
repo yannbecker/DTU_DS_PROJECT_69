@@ -1,4 +1,4 @@
-from shingle import shingle
+from lsh_utils.shingle import shingle
 from mmh3 import hash 
 
 

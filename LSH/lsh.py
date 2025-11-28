@@ -120,16 +120,15 @@ if __name__ == "__main__" :
     json_path = 'DTU_DS_PROJECT_69/data/processed/filtered_articles_Nmostcited.json'
 
     data = preprocess_lsh(dataset_path = json_path)
+    print("preprocessing done")
     #print("keys : ", data[0].keys(), '\n', 'length : ',len(data), '\n', "Ids : ", [a['id'] for a in data][:10], '\n', "first abstract : ", data[0]["abstract"][:500] )
-    
-    # data = [{'id':1, 'abstract':"Bob loves datascience. He likes deep learning and random forests"}, {'id':2, 'abstract':"world my beautiful world"}]
 
     Most_similar, Scores = lsh(
-        input = "Bob loves datascience. He likes deep learning and random forests",
+        input = data[0]['abstract'],
         article_list = data,
         shingle_size = 7,
-        nb_band = 4,
-        band_size = 5,
+        nb_band = 10,
+        band_size = 10,
         )
     
     print("Most similar documents : ", Most_similar, '\n', "Jaccard similarity scores : ", Scores)
