@@ -1,8 +1,8 @@
 # Jaccard similarity
 
-def Jaccard_similarity(input_signature, doc_idx, signature_matrix) -> float :
+def Jaccard_similarity(input_signature, doc_signature) -> float :
     "Returns an approximation of the jaccard similarity between 2 documents doc_name1 and doc_name2 using signatures"
-    sig = signature_matrix[:,doc_idx] 
+    sig = doc_signature 
     S = 0
     k = len(sig) # size of signature list
     assert k == len(input_signature), "Signatures are not matching size"

@@ -24,7 +24,7 @@ def preprocess_lsh(dataset_path):
             data: Dict[str, Any] = json.load(f)
         print(f"Data succesfully loaded")
         
-        article_list = [{'id': article['id'], 'abstract' : article['abstract']} for article in data['articles']] 
+        article_list = [{'id': article['id'], 'abstract' : article['clean_text']} for article in data['articles']] 
         return article_list
 
     #data = {'articles' : [d1 = {'id' : ..., 'authors' : ...,'abstract': ..., 'clean_text' : ... , 'categories' : ... , 'refs' :  ... } , d2, ...]}
@@ -34,7 +34,7 @@ def preprocess_lsh(dataset_path):
 
 # Implementing lsh function         
 
-def lsh(input, signature_matrix, idx_to_id, shingle_size, nb_band, band_size):
+def lsh(input, signature_matrix, idx_to_id, m, shingle_size, nb_band, band_size):
     """
     Inputs :
         input : input text from which we want to obtain sources
@@ -67,14 +67,13 @@ def lsh(input, signature_matrix, idx_to_id, shingle_size, nb_band, band_size):
     print("Computing signature of input ...")
     input_signature = signatures([{'id':'input', 'abstract':input}],
                                  shingle_size = shingle_size,
-                                 signature_size = k)['input']
+                                 signature_size = k)[0][:,0]
     
     # 2. Find the documents that are most likely to be similar to input using LSH method
 
     print("Performing LSH to find similar candidates ...")
     similar_candidates = {}
     n = len(signature_matrix[0])  # number articles in the dataset
-    m = 2*n # number of buckets
 
     for band_nb in tqdm(range(nb_band), desc="LSH Bands"):
         input_hash = lsh_band_hash(
@@ -104,13 +103,12 @@ def lsh(input, signature_matrix, idx_to_id, shingle_size, nb_band, band_size):
     Ordered_similarities = []
     for idx in tqdm(similar_candidates, desc="Calculating Similarities"):
         j = Jaccard_similarity(input_signature = input_signature, 
-                               doc_idx = idx, 
-                               dic_signatures = signature_matrix[:idx])
+                               doc_signature = signature_matrix[:,idx])
         Ordered_similarities.append(j)
     Most_similar = zip(Ordered_similar_candidates,Ordered_similarities)
     Most_similar = sorted(Most_similar, key = lambda pair:pair[1], reverse = True)
     Scores = [ p[1] for p in Most_similar]
-    Most_similar = [idx_to_id[p[0]] for p in Most_similar]
+    Most_similar = [idx_to_id[p[0]]['id'] for p in Most_similar]
     
     return Most_similar, Scores
 
@@ -120,7 +118,11 @@ if __name__ == "__main__" :
 
     data_Nmost = preprocess_lsh(dataset_path = json_path_Nmost)
     print("preprocessing done")
-    #print("keys : ", data[0].keys(), '\n', 'length : ',len(data), '\n', "Ids : ", [a['id'] for a in data][:10], '\n', "first abstract : ", data[0]["abstract"][:500] )
+
+    try :
+        np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures_lsh/idx_id_Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
+    except Exception :
+        print("echec")
 
     q = 7
     b = 4
@@ -132,7 +134,8 @@ if __name__ == "__main__" :
         signature_size = b*r
         )
     
-    np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures/Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
+    np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures_lsh/Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
+    np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures_lsh/idx_id_Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
 
     Most_similar, Scores = lsh(
         input = data_Nmost[0]['abstract'],
