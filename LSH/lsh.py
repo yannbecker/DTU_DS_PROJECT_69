@@ -96,6 +96,8 @@ def lsh(input,article_list, shingle_size, nb_band, band_size):
                     similar_candidates[doc_id] += 1
                 else :
                     similar_candidates[doc_id] = 1
+        percentage = band_nb+1 / n
+        print(f"{percentage} % of signatures computed ... \n")
     print("LSH successfully performed to find similar candidates")
 
     # 3. Compute the actual similarity between input and these documents
