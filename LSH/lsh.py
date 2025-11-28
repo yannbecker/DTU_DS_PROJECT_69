@@ -1,5 +1,6 @@
 import json
 from typing import Dict, Any
+from tqdm import tqdm
 
 import os
 from pathlib import Path
@@ -79,13 +80,13 @@ def lsh(input,article_list, shingle_size, nb_band, band_size):
     n = len(dic_signatures)  # number articles in the dataset
     m = 2*n # number of buckets
 
-    for band_nb in range(nb_band):
+    for band_nb in tqdm(range(nb_band), desc="LSH Bands"):
         input_hash = lsh_band_hash(
             band = input_signature[band_nb*band_size:(band_nb+1)*band_size],
             m = m,
             lsh_seed = band_nb
         )
-        for doc_id in dic_signatures:
+        for doc_id in tqdm(dic_signatures, desc="Comparing Documents"):
             doc_hash = lsh_band_hash(
                 band = dic_signatures[doc_id][band_nb*band_size:(band_nb+1)*band_size],
                 m = m,
@@ -105,7 +106,7 @@ def lsh(input,article_list, shingle_size, nb_band, band_size):
     print("Calculation of the actual similarities ...")
     Ordered_similar_candidates = similar_candidates.keys()
     Ordered_similarities = []
-    for doc_id in similar_candidates :
+    for doc_id in tqdm(similar_candidates, desc="Calculating Similarities"):
         j = Jaccard_similarity(input_signature = input_signature, 
                                doc_name = doc_id, 
                                dic_signatures = dic_signatures)
@@ -119,7 +120,7 @@ def lsh(input,article_list, shingle_size, nb_band, band_size):
 
 if __name__ == "__main__" :
 
-    json_path = 'DTU_DS_PROJECT_69/data/processed/filtered_articles_Nmostcited.json'
+    json_path = 'data/processed/filtered_articles_Nmostcited.json'
 
     data = preprocess_lsh(dataset_path = json_path)
     print("preprocessing done")
