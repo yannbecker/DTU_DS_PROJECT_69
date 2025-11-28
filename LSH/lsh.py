@@ -123,8 +123,8 @@ if __name__ == "__main__" :
     #print("keys : ", data[0].keys(), '\n', 'length : ',len(data), '\n', "Ids : ", [a['id'] for a in data][:10], '\n', "first abstract : ", data[0]["abstract"][:500] )
 
     q = 7
-    b = 10
-    r = 10
+    b = 4
+    r = 5
 
     signature_matrix_Nmost, idx_to_id_Nmost = signatures(
         doc_list=data_Nmost,
@@ -132,15 +132,15 @@ if __name__ == "__main__" :
         signature_size = b*r
         )
     
-    np.save(file = "DTU_DS_PROJECT_69/data/processed/signatures/Nmost_q7_b10_r10", arr = signature_matrix_Nmost)
+    np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures/Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
 
     Most_similar, Scores = lsh(
         input = data_Nmost[0]['abstract'],
         signature_matrix = signature_matrix_Nmost,
         idx_to_id = idx_to_id_Nmost,
-        shingle_size = 7,
-        nb_band = 10,
-        band_size = 10,
+        shingle_size = q,
+        nb_band = b,
+        band_size = r,
         )
     
     print("Most similar documents : ", Most_similar, '\n', "Jaccard similarity scores : ", Scores)
