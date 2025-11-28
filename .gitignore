@@ -13,6 +13,12 @@ __pycache__/
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 
+# Test files
+etude_dataset.py
+etude_dataset2.py
+test.py
+test_and_process.py
+
 # OS generated files
 .DS_Store
 .DS_Store?
