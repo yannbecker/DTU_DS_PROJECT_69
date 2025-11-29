@@ -6,9 +6,9 @@ import numpy as np
 import os
 from pathlib import Path
 
-from lsh_utils.signatures import signatures
-from lsh_utils.Bucket_hashing import lsh_band_hash
-from lsh_utils.Jaccard_similarity import Jaccard_similarity
+from LSH.lsh_utils.signatures import signatures
+from LSH.lsh_utils.Bucket_hashing import lsh_band_hash
+from LSH.lsh_utils.Jaccard_similarity import Jaccard_similarity
 
 # Preprocessing the dataset to keep only the relevant information
 

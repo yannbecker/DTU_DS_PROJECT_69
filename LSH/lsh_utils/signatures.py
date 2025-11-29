@@ -1,5 +1,5 @@
-from lsh_utils.minhash import minhash
-from lsh_utils.shingle import shingle
+from LSH.lsh_utils.minhash import minhash
+from LSH.lsh_utils.shingle import shingle
 import numpy as np
 from tqdm import tqdm
 
@@ -18,7 +18,7 @@ def signatures(doc_list, shingle_size, signature_size):
     # signature of doc no "id" using minhashing on the shingle_list. Size of the shingles is shingle_size
     for i in tqdm(range(n), desc="Computing signatures"):
         id = doc_list[i]["id"]
-        abstract = doc_list[i]["abstract"]
+        abstract = doc_list[i]["clean_text"]
         idx_to_id[i] = id
         sig[:,i] = np.array(minhash(shingle(q=shingle_size, text=abstract), k=signature_size))
     print("min hashing of the documents complete")
