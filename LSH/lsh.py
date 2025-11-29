@@ -24,7 +24,7 @@ def preprocess_lsh(dataset_path):
             data: Dict[str, Any] = json.load(f)
         print(f"Data succesfully loaded")
         
-        article_list = [{'id': article['id'], 'abstract' : article['clean_text']} for article in data['articles']] 
+        article_list = [{'id': article['id'], 'clean_text' : article['clean_text']} for article in data['articles']] 
         return article_list
 
     #data = {'articles' : [d1 = {'id' : ..., 'authors' : ...,'abstract': ..., 'clean_text' : ... , 'categories' : ... , 'refs' :  ... } , d2, ...]}
@@ -34,7 +34,7 @@ def preprocess_lsh(dataset_path):
 
 # Implementing lsh function         
 
-def lsh(input, signature_matrix, idx_to_id, m, shingle_size, nb_band, band_size):
+def lsh(input, article_list ,signature_matrix, idx_to_id, q, m, shingle_size, nb_band, band_size):
     """
     Inputs :
         input : input text from which we want to obtain sources
@@ -102,8 +102,10 @@ def lsh(input, signature_matrix, idx_to_id, m, shingle_size, nb_band, band_size)
     Ordered_similar_candidates = similar_candidates.keys()
     Ordered_similarities = []
     for idx in tqdm(similar_candidates, desc="Calculating Similarities"):
-        j = Jaccard_similarity(input_signature = input_signature, 
-                               doc_signature = signature_matrix[:,idx])
+        j = Jaccard_similarity(input_text= input, 
+                               article_list= article_list,
+                               candidate_idx=idx,
+                               q=q)
         Ordered_similarities.append(j)
     Most_similar = zip(Ordered_similar_candidates,Ordered_similarities)
     Most_similar = sorted(Most_similar, key = lambda pair:pair[1], reverse = True)
@@ -112,40 +114,21 @@ def lsh(input, signature_matrix, idx_to_id, m, shingle_size, nb_band, band_size)
     
     return Most_similar, Scores
 
-if __name__ == "__main__" :
+def lsh_n(n,input, article_list ,signature_matrix, idx_to_id, q, m, shingle_size, nb_band, band_size) : 
+    """ Returns the Most_similar list of lsh with the n most relevant results only. If the number of result from lsh 
+    is < n, random articles from the dataset are added"""
 
-    json_path_Nmost = 'DTU_DS_PROJECT_69/data/processed/filtered_articles_Nmostcited.json'
+    Most_similar = lsh(input, article_list ,signature_matrix, idx_to_id, q, m, shingle_size, nb_band, band_size)[0]
+    length = len(Most_similar)
+    if length < n :
+        c = 0
+        while length < n :
+            extra_id = article_list[c]['id']
+            if extra_id not in Most_similar :
+                Most_similar.append(extra_id)
+                length += 1
+            c += 1    
+    return Most_similar[:n]
 
-    data_Nmost = preprocess_lsh(dataset_path = json_path_Nmost)
-    print("preprocessing done")
-
-    try :
-        np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures_lsh/idx_id_Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
-    except Exception :
-        print("echec")
-
-    q = 7
-    b = 4
-    r = 5
-
-    signature_matrix_Nmost, idx_to_id_Nmost = signatures(
-        doc_list=data_Nmost,
-        shingle_size = q,
-        signature_size = b*r
-        )
-    
-    np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures_lsh/Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
-    np.save(file = f"DTU_DS_PROJECT_69/data/processed/signatures_lsh/idx_id_Nmost_q{q}_b{b}_r{r}", arr = signature_matrix_Nmost)
-
-    Most_similar, Scores = lsh(
-        input = data_Nmost[0]['abstract'],
-        signature_matrix = signature_matrix_Nmost,
-        idx_to_id = idx_to_id_Nmost,
-        shingle_size = q,
-        nb_band = b,
-        band_size = r,
-        )
-    
-    print("Most similar documents : ", Most_similar, '\n', "Jaccard similarity scores : ", Scores)
 
 
