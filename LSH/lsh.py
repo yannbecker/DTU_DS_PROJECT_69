@@ -24,7 +24,7 @@ def preprocess_lsh(dataset_path):
             data: Dict[str, Any] = json.load(f)
         print(f"Data succesfully loaded")
         
-        article_list = [{'id': article['id'], 'abstract' : article['clean_text']} for article in data['articles']] 
+        article_list = [{'id': article['id'], 'clean_text' : article['clean_text']} for article in data['articles']] 
         return article_list
 
     #data = {'articles' : [d1 = {'id' : ..., 'authors' : ...,'abstract': ..., 'clean_text' : ... , 'categories' : ... , 'refs' :  ... } , d2, ...]}
@@ -34,7 +34,7 @@ def preprocess_lsh(dataset_path):
 
 # Implementing lsh function         
 
-def lsh(input, article_list ,signature_matrix, idx_to_id, m, shingle_size, nb_band, band_size):
+def lsh(input, article_list ,signature_matrix, idx_to_id, q, m, shingle_size, nb_band, band_size):
     """
     Inputs :
         input : input text from which we want to obtain sources
@@ -104,7 +104,8 @@ def lsh(input, article_list ,signature_matrix, idx_to_id, m, shingle_size, nb_ba
     for idx in tqdm(similar_candidates, desc="Calculating Similarities"):
         j = Jaccard_similarity(input_text= input, 
                                article_list= article_list,
-                               candidate_index=idx)
+                               candidate_idx=idx,
+                               q=q)
         Ordered_similarities.append(j)
     Most_similar = zip(Ordered_similar_candidates,Ordered_similarities)
     Most_similar = sorted(Most_similar, key = lambda pair:pair[1], reverse = True)
@@ -113,6 +114,21 @@ def lsh(input, article_list ,signature_matrix, idx_to_id, m, shingle_size, nb_ba
     
     return Most_similar, Scores
 
+def lsh_n(n,input, article_list ,signature_matrix, idx_to_id, q, m, shingle_size, nb_band, band_size) : 
+    """ Returns the Most_similar list of lsh with the n most relevant results only. If the number of result from lsh 
+    is < n, random articles from the dataset are added"""
+
+    Most_similar = lsh(input, article_list ,signature_matrix, idx_to_id, q, m, shingle_size, nb_band, band_size)[0]
+    length = len(Most_similar)
+    if length < n :
+        c = 0
+        while length < n :
+            extra_id = article_list[c]['id']
+            if extra_id not in Most_similar :
+                Most_similar.append(extra_id)
+                length += 1
+            c += 1    
+    return Most_similar[:n]
 
 
 
