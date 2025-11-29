@@ -23,3 +23,8 @@ test_and_process.py
 .DS_Store
 .DS_Store?
 ._*
+
+# Method generated files
+*.json
+*.npy
+*.index
